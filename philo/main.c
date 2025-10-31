@@ -5,8 +5,8 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: mdalkili <mdalkilic344@student.42.fr>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/10/23 18:16:30 by mdalkili          #+#    #+#             */
-/*   Updated: 2025/10/23 18:42:34 by mdalkili         ###   ########.fr       */
+/*   Created: 2025/10/25 02:28:16 by mdalkili          #+#    #+#             */
+/*   Updated: 2025/10/31 04:44:12 by mdalkili         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,40 +17,65 @@ static int	is_valid_argument(char *str)
 	int	i;
 
 	i = 0;
-	while (ft_isspace(str[i]))
+	while ((str[i] >= 9 && str[i] <= 13) || str[i] == 32)
 		i++;
 	if (str[i] == '+')
 		i++;
-	if (!ft_is_digit(str[i]))
+	if (!(str[i] >= '0' && str[i] <= '9'))
 		return (0);
 	if (str[i] == '+')
 		i++;
 	while (str[i])
 	{
-		if (!ft_is_digit(str[i]))
+		if (!(str[i] >= '0' && str[i] <= '9'))
 			return (0);
 		i++;
 	}
 	return (1);
 }
 
-static void	init_sim(t_sim *sim, char **argv)
+int	init_monitor(t_monitor *monitor)
 {
-	sim->num_of_philos = ft_atoi(argv[1]);
-	sim->time_to_die = ft_atoi(argv[2]);
-	sim->time_to_eat = ft_atoi(argv[3]);
-	sim->time_to_sleep = ft_atoi(argv[4]);
-	if (argv[5])
-		sim->number_of_must_eat = ft_atoi(argv[5]);
-	else
-		sim->number_of_must_eat = -1;
-	sim->died = 0;
-	sim->total_philos = 0;
-	pthread_mutex_init(&sim->meal_lock, NULL);
-	pthread_mutex_init(&sim->total_philos_lock, NULL);
+	monitor->stop = 0;
+	if (pthread_mutex_init(&monitor->dead_lock, NULL) != 0)
+		return (printf("Dead Lock Mutex Inıt error"), 0);
+	if (pthread_mutex_init(&monitor->meal_lock, NULL) != 0)
+	{
+		pthread_mutex_destroy(&monitor->dead_lock);
+		return (printf("Meal Lock Mutex Inıt error"), 0);
+	}
+	return (1);
 }
 
-static int	validate_and_initialize(char **argv, t_sim *sim)
+int	init_philos(char **argv, t_monitor *monitor)
+{
+	int	i;
+
+	i = 0;
+	monitor->philos = (t_philo *)malloc(sizeof(t_philo) * ft_atoi(argv[1]));
+	if (!monitor->philos)
+		return (printf("Malloc Error"), 0);
+	while (i < ft_atoi(argv[1]))
+	{
+		monitor->philos[i].id = i + 1;
+		monitor->philos[i].time_to_die = ft_atoi(argv[2]);
+		monitor->philos[i].time_to_eat = ft_atoi(argv[3]);
+		monitor->philos[i].time_to_sleep = ft_atoi(argv[4]);
+		monitor->philos[i].meals_eaten = 0;
+		monitor->philos[i].l_fork = &monitor->forks[i];
+		monitor->philos[i].r_fork = &monitor->forks[(i + 1)
+			% monitor->num_of_philos];
+		monitor->philos[i].monitor = monitor;
+		i++;
+	}
+	if (argv[5])
+		monitor->number_of_must_eat = ft_atoi(argv[5]);
+	else
+		monitor->number_of_must_eat = -1;
+	return (1);
+}
+
+static int	validate(char **argv)
 {
 	int	i;
 
@@ -58,31 +83,29 @@ static int	validate_and_initialize(char **argv, t_sim *sim)
 	while (argv[i])
 	{
 		if (!is_valid_argument(argv[i]))
-			return (1);
+			return (0);
 		i++;
 	}
-	init_sim(sim, argv);
-	if (sim->num_of_philos < 1 || sim->num_of_philos > PHILO_MAX
-		|| sim->time_to_die <= 0 || sim->time_to_eat <= 0
-		|| sim->time_to_sleep <= 0)
-		return (1);
-	if (argv[5] && sim->number_of_must_eat <= 0)
-		return (1);
-	sim->start_time = get_current_time();
-	return (0);
+	return (1);
 }
 
-int	main(int ac, char **av)
+int	main(int argc, char **argv)
 {
-	t_sim	sim;
+	t_monitor	monitor;
 
-	if (ac != 5 && ac != 6)
-		ft_error("Invalid argument count!\n");
-	if (validate_and_initializea(av, &sim))
-		ft_error("Invalid argument error!\n");
-	init_forks(&sim);
-	init_philos(&sim);
-	start_threads(&sim);
-	destroy_mutexes(NULL, &sim);
+	if (argc != 5 && argc != 6)
+	{
+		printf("Invalid argument count!\n");
+		return (1);
+	}
+	if (!validate(argv))
+	{
+		printf("Invalid argument error!\n");
+		return (1);
+	}
+	if (!initialize(&monitor, argv))
+		return (1);
+	if (!create_threads(&monitor) || !join_threads(&monitor))
+		return (1);
 	return (0);
 }

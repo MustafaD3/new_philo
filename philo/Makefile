@@ -1,7 +1,7 @@
 NAME = philo
 CC = cc
 CFLAGS = -Wall -Wextra -Werror
-SRC = main.c utils.c utils_two.c init_philo_and_forks.c threads.c philo_routine.c philo_sim.c
+SRC = main.c src/string_utils.c src/time_utils.c src/philo.c src/log.c src/thread_and_mutex.c src/monitor.c src/fork.c
 OBJS = $(SRC:.c=.o)
 
 all: $(NAME)
@@ -9,8 +9,8 @@ all: $(NAME)
 $(NAME): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+run:$(NAME)
+	valgrind --track-origins=yes --leak-check=full -s ./philo 1 410 200 200
 
 clean:
 	rm -f $(OBJS)
